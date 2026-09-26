@@ -1,12 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import AuthCard, { ErrorText, FieldLabel, SubmitButton, TextInput } from "@/components/AuthCard";
 import { login } from "@/lib/api";
 
 export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
+  );
+}
+
+function LoginForm() {
   const router = useRouter();
   const justCreated = useSearchParams().get("created") === "1";
   const [email, setEmail] = useState("");
@@ -21,8 +29,6 @@ export default function LoginPage() {
     try {
       const result = await login({ email, password });
       localStorage.setItem("token", result.token);
-      // Task 0.8 (tenant switcher + nav shell) will replace this with the
-      // real dashboard route once it exists.
       router.push("/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Check your email and password and try again.");
