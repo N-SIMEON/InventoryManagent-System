@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import AuthCard, { ErrorText, FieldLabel, SubmitButton, TextInput } from "@/components/AuthCard";
 import { acceptInvite } from "@/lib/api";
@@ -9,6 +9,14 @@ import { acceptInvite } from "@/lib/api";
 // invited to an existing tenant (as opposed to /signup, which creates a
 // brand-new one) and just needs to set their name and password.
 export default function InviteAcceptPage() {
+  return (
+    <Suspense fallback={null}>
+      <InviteAcceptForm />
+    </Suspense>
+  );
+}
+
+function InviteAcceptForm() {
   const router = useRouter();
   const inviteToken = useSearchParams().get("token") ?? "";
   const [name, setName] = useState("");
