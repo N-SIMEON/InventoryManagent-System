@@ -1,24 +1,59 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
+  // Note: In Prisma v7, the URL is managed in prisma.config.ts, not here.
 }
 
+// ==========================================
+// FOUNDATION MODELS (Phase 0)
+// ==========================================
+
 model Tenant {
-  id          String       @id @default(uuid()) @db.Uuid
-  name        String
-  createdAt   DateTime     @default(now())
-  products    Product[]
-  memberships Membership[]
-  suppliers   Supplier[]   // <-- ADD THIS RELATION
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  createdAt DateTime @default(now())
+
+  // Relations
+  products       Product[]
+  memberships    Membership[]
+  suppliers      Supplier[]
+  purchaseOrders PurchaseOrder[]
 }
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+
+  // Relations
+  memberships Membership[]
+}
+
+model Membership {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  tenantId  String   @db.Uuid
+  role      String   @default("owner")
+  createdAt DateTime @default(now())
+
+  // Relations
+  user   User   @relation(fields: [userId], references: [id])
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([userId, tenantId])
+  @@index([tenantId])
+}
+
+// ==========================================
+// CATALOG & STOCK MODELS (Phase 1)
+// ==========================================
 
 model Product {
   id        String   @id @default(uuid()) @db.Uuid
@@ -29,30 +64,16 @@ model Product {
   quantity  Int      @default(0)
   createdAt DateTime @default(now())
 
+  // Relations
+  purchaseOrderLines PurchaseOrderLine[]
+
   @@unique([tenantId, sku])
   @@index([tenantId])
 }
 
-model User {
-  id           String       @id @default(uuid()) @db.Uuid
-  email        String       @unique
-  passwordHash String
-  createdAt    DateTime     @default(now())
-  memberships  Membership[]
-}
-
-model Membership {
-  id        String   @id @default(uuid()) @db.Uuid
-  userId    String   @db.Uuid
-  tenantId  String   @db.Uuid
-  role      String   @default("owner")
-  createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id])
-  tenant    Tenant   @relation(fields: [tenantId], references: [id])
-
-  @@unique([userId, tenantId])
-  @@index([tenantId])
-}
+// ==========================================
+// PROCUREMENT MODELS (Phase 2 - Tasks 2.1 & 2.2)
+// ==========================================
 
 model Supplier {
   id           String   @id @default(uuid()) @db.Uuid
@@ -66,6 +87,62 @@ model Supplier {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  // Relations
+  purchaseOrders PurchaseOrder[]
+
   @@index([tenantId])
   @@index([isActive])
+}
+
+model PurchaseOrder {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @db.Uuid
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
+  supplierId String   @db.Uuid
+  supplier   Supplier @relation(fields: [supplierId], references: [id])
+
+  orderNumber String // e.g., "PO-2024-001"
+  status      POStatus @default(DRAFT)
+  totalAmount Float    @default(0)
+  notes       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  lines PurchaseOrderLine[]
+
+  @@unique([tenantId, orderNumber])
+  @@index([tenantId])
+  @@index([supplierId])
+  @@index([status])
+}
+
+model PurchaseOrderLine {
+  id              String        @id @default(uuid()) @db.Uuid
+  purchaseOrderId String        @db.Uuid
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+
+  productId String  @db.Uuid
+  product   Product @relation(fields: [productId], references: [id])
+
+  quantity  Int
+  unitPrice Float
+  lineTotal Float // Computed: quantity * unitPrice
+
+  receivedQty Int @default(0) // Used in Task 2.3 (Receiving)
+
+  @@index([purchaseOrderId])
+}
+
+// ==========================================
+// ENUMS
+// ==========================================
+
+enum POStatus {
+  DRAFT
+  SUBMITTED
+  PARTIALLY_RECEIVED
+  RECEIVED
+  CANCELLED
 }
