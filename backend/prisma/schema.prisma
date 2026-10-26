@@ -17,6 +17,7 @@ model Tenant {
   createdAt   DateTime     @default(now())
   products    Product[]
   memberships Membership[]
+  suppliers   Supplier[]   // <-- ADD THIS RELATION
 }
 
 model Product {
@@ -51,4 +52,20 @@ model Membership {
 
   @@unique([userId, tenantId])
   @@index([tenantId])
+}
+
+model Supplier {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @db.Uuid
+  tenant       Tenant   @relation(fields: [tenantId], references: [id])
+  name         String
+  contactEmail String?
+  contactPhone String?
+  address      String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([isActive])
 }
