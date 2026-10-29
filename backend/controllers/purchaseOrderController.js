@@ -179,3 +179,83 @@ exports.cancelPurchaseOrder = async (req, res) => {
     res.status(500).json({ error: "Internal server error" });
   }
 };
+exports.receivePurchaseOrder = async (req, res) => {
+  try {
+    const { lines } = req.body; // Expected: [{ lineId: "uuid", receivedQty: 10 }]
+    
+    if (!Array.isArray(lines) || lines.length === 0) {
+      return res.status(400).json({ error: "lines array with receivedQty is required" });
+    }
+
+    // 1. Fetch the PO and verify ownership & status
+    const po = await prisma.purchaseOrder.findFirst({
+      where: { id: req.params.id, tenantId: req.user.tenantId },
+      include: { lines: true },
+    });
+
+    if (!po) return res.status(404).json({ error: "Purchase Order not found" });
+    
+    // Can only receive SUBMITTED or PARTIALLY_RECEIVED POs
+    if (po.status !== "SUBMITTED" && po.status !== "PARTIALLY_RECEIVED") {
+      return res.status(400).json({ error: `Cannot receive items on a ${po.status} purchase order` });
+    }
+
+    // 2. Process each line
+    let newPoStatus = po.status;
+    let allLinesFullyReceived = true;
+    let atLeastOneLineReceived = po.status === "PARTIALLY_RECEIVED"; // Keep true if already partially received
+
+    for (const lineUpdate of lines) {
+      const line = po.lines.find(l => l.id === lineUpdate.lineId);
+      
+      if (!line) return res.status(400).json({ error: `Line ${lineUpdate.lineId} not found in this PO` });
+      if (lineUpdate.receivedQty <= 0) return res.status(400).json({ error: "receivedQty must be greater than 0" });
+      if (lineUpdate.receivedQty + line.receivedQty > line.quantity) {
+        return res.status(400).json({ error: `Received quantity exceeds ordered quantity for line ${lineUpdate.lineId}` });
+      }
+
+      // Update the line's received quantity
+      const updatedLine = await prisma.purchaseOrderLine.update({
+        where: { id: lineUpdate.lineId },
+        data: { receivedQty: { increment: lineUpdate.receivedQty } },
+      });
+
+      // Check if this specific line is fully received
+      if (updatedLine.receivedQty < updatedLine.quantity) {
+        allLinesFullyReceived = false;
+      } else {
+        atLeastOneLineReceived = true;
+      }
+
+      // --- TODO: TASK 1.5 INTEGRATION ---
+      // When Elissa finishes Task 1.5, replace the direct product update below with:
+      // await prisma.stockMovement.create({ data: { productId: line.productId, quantity: lineUpdate.receivedQty, type: 'RECEIVING', ... } });
+      
+      // Temporary direct update for testing purposes:
+      await prisma.product.update({
+        where: { id: line.productId },
+        data: { quantity: { increment: lineUpdate.receivedQty } },
+      });
+      // ----------------------------------
+    }
+
+    // 3. Derive the new PO Status
+    if (allLinesFullyReceived) {
+      newPoStatus = "RECEIVED";
+    } else if (atLeastOneLineReceived) {
+      newPoStatus = "PARTIALLY_RECEIVED";
+    }
+
+    // 4. Update the PO status
+    const updatedPo = await prisma.purchaseOrder.update({
+      where: { id: po.id },
+      data: { status: newPoStatus },
+      include: { lines: true, supplier: { select: { name: true } } },
+    });
+
+    res.json({ message: "Items received successfully", po: updatedPo });
+  } catch (err) {
+    console.error("Receive PO error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
