@@ -4,6 +4,10 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const prisma = require("./db");
 
+const supplierRoutes = require("./routes/supplierRoutes");
+const purchaseOrderRoutes = require("./routes/purchaseOrderRoutes");
+
+
 const app = express();
 app.use(express.json());
 const PORT = process.env.PORT || 4000;
@@ -78,7 +82,8 @@ app.post("/login", async (req, res) => {
     res.status(500).json({ error: "internal error" });
   }
 });
-
+app.use("/suppliers", supplierRoutes);
+app.use("/purchase-orders", purchaseOrderRoutes);
 app.listen(PORT, () => {
   console.log(`API running on port ${PORT}`);
 });
