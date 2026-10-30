@@ -12,4 +12,6 @@ router.put("/:id", poController.updatePurchaseOrder);
 router.post("/:id/submit", poController.submitPurchaseOrder); // Status derivation
 router.post("/:id/cancel", poController.cancelPurchaseOrder); // Soft delete via status
 
+router.post("/:id/receive", poController.receivePurchaseOrder);
+
 module.exports = router;
