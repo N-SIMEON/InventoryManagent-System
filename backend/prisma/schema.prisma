@@ -62,10 +62,13 @@ model Product {
   name      String
   sku       String
   quantity  Int      @default(0)
+  trackingType       TrackingType      @default(NONE)
   createdAt DateTime @default(now())
 
   // Relations
   purchaseOrderLines PurchaseOrderLine[]
+  lots               Lot[]   
+  serials            SerialNumber[] 
 
   @@unique([tenantId, sku])
   @@index([tenantId])
@@ -145,4 +148,46 @@ enum POStatus {
   PARTIALLY_RECEIVED
   RECEIVED
   CANCELLED
+}
+// 1. Add these Enums at the bottom with  other enums
+enum TrackingType {
+  NONE
+  LOT
+  SERIAL
+}
+
+enum SerialStatus {
+  IN_STOCK
+  SOLD
+  SCRAPPED
+}
+
+
+// 3. Add these two new models
+model Lot {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @db.Uuid
+  productId    String   @db.Uuid
+  product      Product  @relation(fields: [productId], references: [id])
+  lotNumber    String
+  expiryDate   DateTime?
+  quantity     Int      @default(0) // On-hand qty for this specific lot
+  createdAt    DateTime @default(now())
+
+  @@unique([tenantId, productId, lotNumber])
+  @@index([tenantId])
+  @@index([expiryDate])
+}
+
+model SerialNumber {
+  id           String       @id @default(uuid()) @db.Uuid
+  tenantId     String       @db.Uuid
+  productId    String       @db.Uuid
+  product      Product      @relation(fields: [productId], references: [id])
+  serialNumber String
+  status       SerialStatus @default(IN_STOCK)
+  createdAt    DateTime     @default(now())
+
+  @@unique([tenantId, serialNumber])
+  @@index([tenantId])
 }

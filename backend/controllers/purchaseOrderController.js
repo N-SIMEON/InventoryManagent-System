@@ -181,72 +181,118 @@ exports.cancelPurchaseOrder = async (req, res) => {
 };
 exports.receivePurchaseOrder = async (req, res) => {
   try {
-    const { lines } = req.body; // Expected: [{ lineId: "uuid", receivedQty: 10 }]
+    const { lines } = req.body; 
     
     if (!Array.isArray(lines) || lines.length === 0) {
-      return res.status(400).json({ error: "lines array with receivedQty is required" });
+      return res.status(400).json({ error: "lines array is required" });
     }
 
     // 1. Fetch the PO and verify ownership & status
     const po = await prisma.purchaseOrder.findFirst({
       where: { id: req.params.id, tenantId: req.user.tenantId },
-      include: { lines: true },
+      include: { lines: { include: { product: true } } }, // Include product to check trackingType
     });
 
     if (!po) return res.status(404).json({ error: "Purchase Order not found" });
-    
-    // Can only receive SUBMITTED or PARTIALLY_RECEIVED POs
     if (po.status !== "SUBMITTED" && po.status !== "PARTIALLY_RECEIVED") {
       return res.status(400).json({ error: `Cannot receive items on a ${po.status} purchase order` });
     }
 
-    // 2. Process each line
     let newPoStatus = po.status;
     let allLinesFullyReceived = true;
-    let atLeastOneLineReceived = po.status === "PARTIALLY_RECEIVED"; // Keep true if already partially received
+    let atLeastOneLineReceived = po.status === "PARTIALLY_RECEIVED";
 
+    // 2. Process each line
     for (const lineUpdate of lines) {
       const line = po.lines.find(l => l.id === lineUpdate.lineId);
+      if (!line) return res.status(400).json({ error: `Line ${lineUpdate.lineId} not found` });
       
-      if (!line) return res.status(400).json({ error: `Line ${lineUpdate.lineId} not found in this PO` });
-      if (lineUpdate.receivedQty <= 0) return res.status(400).json({ error: "receivedQty must be greater than 0" });
-      if (lineUpdate.receivedQty + line.receivedQty > line.quantity) {
-        return res.status(400).json({ error: `Received quantity exceeds ordered quantity for line ${lineUpdate.lineId}` });
+      const receivedQty = lineUpdate.receivedQty || 0;
+      if (receivedQty <= 0) return res.status(400).json({ error: "receivedQty must be > 0" });
+      if (receivedQty + line.receivedQty > line.quantity) {
+        return res.status(400).json({ error: `Received qty exceeds ordered qty for line ${lineUpdate.lineId}` });
       }
 
-      // Update the line's received quantity
-      const updatedLine = await prisma.purchaseOrderLine.update({
+      // --- TRACKING TYPE LOGIC ---
+      const trackingType = line.product.trackingType;
+
+      if (trackingType === "LOT") {
+        if (!Array.isArray(lineUpdate.lots) || lineUpdate.lots.length === 0) {
+          return res.status(400).json({ error: "Lot information is required for LOT tracked products" });
+        }
+        // Validate lot quantities sum up to receivedQty
+        const lotTotal = lineUpdate.lots.reduce((sum, l) => sum + l.quantity, 0);
+        if (lotTotal !== receivedQty) {
+          return res.status(400).json({ error: "Sum of lot quantities must equal receivedQty" });
+        }
+
+        // Create/Update Lots
+        for (const lotData of lineUpdate.lots) {
+          await prisma.lot.upsert({
+            where: {
+              tenantId_productId_lotNumber: {
+                tenantId: req.user.tenantId,
+                productId: line.productId,
+                lotNumber: lotData.lotNumber,
+              }
+            },
+            update: { quantity: { increment: lotData.quantity } },
+            create: {
+              tenantId: req.user.tenantId,
+              productId: line.productId,
+              lotNumber: lotData.lotNumber,
+              expiryDate: lotData.expiryDate ? new Date(lotData.expiryDate) : null,
+              quantity: lotData.quantity,
+            },
+          });
+        }
+      } 
+      else if (trackingType === "SERIAL") {
+        if (!Array.isArray(lineUpdate.serials) || lineUpdate.serials.length === 0) {
+          return res.status(400).json({ error: "Serial numbers are required for SERIAL tracked products" });
+        }
+        if (lineUpdate.serials.length !== receivedQty) {
+          return res.status(400).json({ error: "Number of serials must exactly match receivedQty" });
+        }
+
+        // Create Serial Numbers
+        const serialRecords = lineUpdate.serials.map(sn => ({
+          tenantId: req.user.tenantId,
+          productId: line.productId,
+          serialNumber: sn,
+        }));
+
+        await prisma.serialNumber.createMany({
+          data: serialRecords,
+          skipDuplicates: true, // Prevents crash if duplicate sent, though DB unique constraint will also catch it
+        });
+      }
+
+      // --- UPDATE PO LINE & MOCK STOCK LEDGER ---
+      await prisma.purchaseOrderLine.update({
         where: { id: lineUpdate.lineId },
-        data: { receivedQty: { increment: lineUpdate.receivedQty } },
+        data: { receivedQty: { increment: receivedQty } },
       });
 
-      // Check if this specific line is fully received
-      if (updatedLine.receivedQty < updatedLine.quantity) {
+      // TODO: TASK 1.5 INTEGRATION (Replace direct product update with stockMovement)
+      await prisma.product.update({
+        where: { id: line.productId },
+        data: { quantity: { increment: receivedQty } },
+      });
+
+      // Check line completion
+      const newLineReceivedQty = line.receivedQty + receivedQty;
+      if (newLineReceivedQty < line.quantity) {
         allLinesFullyReceived = false;
       } else {
         atLeastOneLineReceived = true;
       }
-
-      // --- TODO: TASK 1.5 INTEGRATION ---
-      // When Elissa finishes Task 1.5, replace the direct product update below with:
-      // await prisma.stockMovement.create({ data: { productId: line.productId, quantity: lineUpdate.receivedQty, type: 'RECEIVING', ... } });
-      
-      // Temporary direct update for testing purposes:
-      await prisma.product.update({
-        where: { id: line.productId },
-        data: { quantity: { increment: lineUpdate.receivedQty } },
-      });
-      // ----------------------------------
     }
 
-    // 3. Derive the new PO Status
-    if (allLinesFullyReceived) {
-      newPoStatus = "RECEIVED";
-    } else if (atLeastOneLineReceived) {
-      newPoStatus = "PARTIALLY_RECEIVED";
-    }
+    // 3. Derive PO Status
+    if (allLinesFullyReceived) newPoStatus = "RECEIVED";
+    else if (atLeastOneLineReceived) newPoStatus = "PARTIALLY_RECEIVED";
 
-    // 4. Update the PO status
     const updatedPo = await prisma.purchaseOrder.update({
       where: { id: po.id },
       data: { status: newPoStatus },
@@ -256,6 +302,7 @@ exports.receivePurchaseOrder = async (req, res) => {
     res.json({ message: "Items received successfully", po: updatedPo });
   } catch (err) {
     console.error("Receive PO error:", err);
+    if (err.code === 'P2002') return res.status(409).json({ error: "Duplicate lot number or serial number provided" });
     res.status(500).json({ error: "Internal server error" });
   }
 };
