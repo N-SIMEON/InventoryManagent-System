@@ -306,3 +306,83 @@ exports.receivePurchaseOrder = async (req, res) => {
     res.status(500).json({ error: "Internal server error" });
   }
 };
+exports.passQualityCheck = async (req, res) => {
+  try {
+    const { lineId, notes } = req.body;
+    if (!lineId) return res.status(400).json({ error: "lineId is required" });
+
+    // 1. Fetch the line and verify tenant ownership
+    const line = await prisma.purchaseOrderLine.findFirst({
+      where: { id: lineId, purchaseOrder: { tenantId: req.user.tenantId } },
+      include: { product: true, purchaseOrder: true },
+    });
+
+    if (!line) return res.status(404).json({ error: "Purchase Order line not found" });
+    if (line.qcStatus !== "PENDING") {
+      return res.status(400).json({ error: `Line is already ${line.qcStatus}` });
+    }
+
+    // 2. Record the QC action
+    await prisma.qualityCheck.create({
+      data: {
+        tenantId: req.user.tenantId,
+        lineId: line.id,
+        status: "PASSED",
+        checkedBy: req.user.userId, // From JWT
+        notes: notes || "Passed standard inspection",
+      },
+    });
+
+    // 3. Update line status
+    await prisma.purchaseOrderLine.update({
+      where: { id: lineId },
+      data: { qcStatus: "PASSED" },
+    });
+
+    res.json({ message: "Quality check passed. Stock is now available." });
+  } catch (err) {
+    console.error("Pass QC error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+exports.failQualityCheck = async (req, res) => {
+  try {
+    const { lineId, notes } = req.body;
+    if (!lineId) return res.status(400).json({ error: "lineId is required" });
+
+    const line = await prisma.purchaseOrderLine.findFirst({
+      where: { id: lineId, purchaseOrder: { tenantId: req.user.tenantId } },
+    });
+
+    if (!line) return res.status(404).json({ error: "Purchase Order line not found" });
+    if (line.qcStatus !== "PENDING") {
+      return res.status(400).json({ error: `Line is already ${line.qcStatus}` });
+    }
+
+    // Record the failure
+    await prisma.qualityCheck.create({
+      data: {
+        tenantId: req.user.tenantId,
+        lineId: line.id,
+        status: "FAILED",
+        checkedBy: req.user.userId,
+        notes: notes || "Failed inspection",
+      },
+    });
+
+    // Update line status
+    await prisma.purchaseOrderLine.update({
+      where: { id: lineId },
+      data: { qcStatus: "FAILED" },
+    });
+
+    // TODO: In a full implementation, we would trigger a "Scrap" or "Return to Vendor" 
+    // stock movement here to deduct the failed qty from the warehouse.
+    
+    res.json({ message: "Quality check failed. Stock quarantined/scrapped." });
+  } catch (err) {
+    console.error("Fail QC error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
