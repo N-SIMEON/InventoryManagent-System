@@ -14,4 +14,7 @@ router.post("/:id/cancel", poController.cancelPurchaseOrder); // Soft delete via
 
 router.post("/:id/receive", poController.receivePurchaseOrder);
 
+router.post("/qc/pass", poController.passQualityCheck);
+router.post("/qc/fail", poController.failQualityCheck);
+
 module.exports = router;
