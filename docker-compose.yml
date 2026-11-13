@@ -25,6 +25,7 @@ services:
       - "4000:4000"
     environment:
       DATABASE_URL: postgres://inventory:inventory@postgres:5432/inventory
+      APP_DATABASE_URL: postgres://app_user:app_user@postgres:5432/inventory
       REDIS_URL: redis://redis:6379
     depends_on:
       - postgres
