@@ -22,10 +22,14 @@ export async function signup(input: {
   if (!BASE_URL) {
     return fakeDelay({ token: "fake-jwt-token", tenantName: input.tenantName });
   }
-  const res = await fetch(`${BASE_URL}/auth/signup`, {
+  const res = await fetch(`${BASE_URL}/signup`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(input),
+    body: JSON.stringify({
+      email: input.email,
+      password: input.password,
+      companyName: input.tenantName,
+    }),
   });
   if (!res.ok) throw new Error(await readError(res));
   return res.json();
@@ -35,7 +39,7 @@ export async function login(input: { email: string; password: string }): Promise
   if (!BASE_URL) {
     return fakeDelay({ token: "fake-jwt-token", tenantName: "Demo Tenant" });
   }
-  const res = await fetch(`${BASE_URL}/auth/login`, {
+    const res = await fetch(`${BASE_URL}/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
@@ -64,7 +68,7 @@ export async function acceptInvite(input: {
 async function readError(res: Response): Promise<string> {
   try {
     const body = await res.json();
-    return body.message ?? `Request failed (${res.status})`;
+        return body.error ?? body.message ?? `Request failed (${res.status})`;
   } catch {
     return `Request failed (${res.status})`;
   }
