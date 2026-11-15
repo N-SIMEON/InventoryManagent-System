@@ -18,4 +18,8 @@ router.post("/:id/receive", authorize("po:receive"), poController.receivePurchas
 router.post("/qc/pass", authorize("qc:pass"), poController.passQualityCheck);
 router.post("/qc/fail", authorize("qc:fail"), poController.failQualityCheck);
 
+
+router.post("/:id/landed-costs", poController.addLandedCost);
+router.post("/:id/allocate-costs", poController.allocateLandedCosts);
+
 module.exports = router;
