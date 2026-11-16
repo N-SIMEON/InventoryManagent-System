@@ -105,6 +105,7 @@ model PurchaseOrder {
   tenant     Tenant   @relation(fields: [tenantId], references: [id])
   supplierId String   @db.Uuid
   supplier   Supplier @relation(fields: [supplierId], references: [id])
+  isDropship     Boolean          @default(false)
 
   orderNumber String // e.g., "PO-2024-001"
   status      POStatus @default(DRAFT)

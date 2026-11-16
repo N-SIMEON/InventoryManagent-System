@@ -197,6 +197,14 @@ exports.receivePurchaseOrder = async (req, res) => {
     if (po.status !== "SUBMITTED" && po.status !== "PARTIALLY_RECEIVED") {
       return res.status(400).json({ error: `Cannot receive items on a ${po.status} purchase order` });
     }
+    if (!po.isDropship) {
+      await prisma.product.update({
+        where: { id: line.productId },
+          data: { quantity: { increment: receivedQty } },
+      });
+    } else {
+     console.log(`[Dropship] Bypassed warehouse stock increment for ${receivedQty} units of ${line.productId}`);
+    }
 
     let newPoStatus = po.status;
     let allLinesFullyReceived = true;
