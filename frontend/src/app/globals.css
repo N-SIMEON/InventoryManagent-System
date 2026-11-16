@@ -3,49 +3,95 @@
 @tailwind utilities;
 
 /* ---------------------------------------------------------------------
-   Design tokens (task 0.7). Change these and the whole app restyles,
-   since tailwind.config.ts reads every one of them.
+   Unified design tokens — single source of truth.
+   Light is the default; dark activates ONLY via .dark on <html>
+   (topbar toggle). The old prefers-color-scheme block was removed:
+   it flipped text to white while cards stayed white (invisible text).
+   --color-* aliases preserve task 0.7 / tailwind.config.ts compat.
    --------------------------------------------------------------------- */
 :root {
-  --color-primary: #4f46e5;
-  --color-primary-hover: #4338ca;
-  --color-primary-fg: #ffffff;
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --surface-2: #f1f3f5;
+  --border: #e4e7eb;
+  --text: #0f172a;
+  --text-muted: #64748b;
+  --text-faint: #94a3b8;
 
-  --color-surface: #ffffff;
-  --color-surface-alt: #f8fafc;
-  --color-border: #e2e8f0;
-  --color-text: #0f172a;
-  --color-text-muted: #64748b;
+  --primary: #2563eb;
+  --primary-hover: #1d4ed8;
+  --primary-fg: #ffffff;
+  --ring: rgba(37, 99, 235, 0.35);
 
-  --color-danger: #dc2626;
-  --color-success: #16a34a;
+  --green: #16a34a;   --green-bg: #dcfce7;
+  --amber: #b45309;   --amber-bg: #fef3c7;
+  --red: #dc2626;     --red-bg: #fee2e2;
+  --slate: #475569;   --slate-bg: #f1f5f9;
+
+  --shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 3px rgba(16, 24, 40, 0.1);
+  --radius: 10px;
+
+  /* Aliases — task 0.7 compatibility (Simeon's tailwind.config.ts reads these) */
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-fg: var(--primary-fg);
+  --color-surface: var(--surface);
+  --color-surface-alt: var(--bg);
+  --color-border: var(--border);
+  --color-text: var(--text);
+  --color-text-muted: var(--text-muted);
+  --color-danger: var(--red);
+  --color-success: var(--green);
 
   --radius-sm: 6px;
-  --radius-md: 10px;
+  --radius-md: var(--radius);
   --radius-lg: 16px;
-
-  --space-1: 4px;
-  --space-2: 8px;
-  --space-3: 12px;
-  --space-4: 16px;
-  --space-6: 24px;
-  --space-8: 32px;
-
-  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --space-1: 4px; --space-2: 8px; --space-3: 12px;
+  --space-4: 16px; --space-6: 24px; --space-8: 32px;
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --color-surface: #0f172a;
-    --color-surface-alt: #1e293b;
-    --color-border: #334155;
-    --color-text: #f1f5f9;
-    --color-text-muted: #94a3b8;
-  }
+.dark {
+  --bg: #0b0f17;
+  --surface: #11161f;
+  --surface-2: #1a2230;
+  --border: #243044;
+  --text: #e6edf6;
+  --text-muted: #93a4bd;
+  --text-faint: #6b7c99;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --slate-bg: #1a2230;
+  --green-bg: #052e16;
+  --amber-bg: #451a03;
+  --red-bg: #450a0a;
 }
 
-body {
-  background: var(--color-surface-alt);
-  color: var(--color-text);
-  font-family: var(--font-sans);
+@layer base {
+  html, body { background: var(--bg); color: var(--text); }
+  body { font-family: var(--font-sans); }
+  * { border-color: var(--border); }
+}
+
+@layer components {
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
+  .input { width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; font-size: 14px; color: var(--text); outline: none; }
+  .input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--ring); }
+  .input::placeholder { color: var(--text-faint); }
+  .label { font-size: 13px; font-weight: 500; color: var(--text-muted); margin-bottom: 6px; display: block; }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: 8px; font-size: 14px; font-weight: 500; padding: 9px 14px; border: 1px solid transparent; cursor: pointer; transition: .15s; white-space: nowrap; }
+  .btn:disabled { opacity: .55; cursor: not-allowed; }
+  .btn-primary { background: var(--primary); color: var(--primary-fg); }
+  .btn-primary:hover:not(:disabled) { background: var(--primary-hover); }
+  .btn-ghost { background: transparent; color: var(--text-muted); }
+  .btn-ghost:hover { background: var(--surface-2); color: var(--text); }
+  .btn-outline { background: var(--surface); border-color: var(--border); color: var(--text); }
+  .btn-outline:hover { background: var(--surface-2); }
+  .btn-sm { padding: 6px 10px; font-size: 13px; }
+  .badge { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; padding: 3px 9px; border-radius: 999px; }
+  .badge .dot { width: 6px; height: 6px; border-radius: 50%; }
+  .th { text-align: left; font-size: 12px; font-weight: 600; letter-spacing: .02em; text-transform: uppercase; color: var(--text-muted); padding: 12px 16px; border-bottom: 1px solid var(--border); background: var(--surface-2); }
+  .td { padding: 14px 16px; border-bottom: 1px solid var(--border); font-size: 14px; vertical-align: middle; }
+  .row:hover { background: var(--surface-2); }
+  .skeleton { background: linear-gradient(90deg, var(--surface-2) 25%, var(--border) 37%, var(--surface-2) 63%); background-size: 400% 100%; animation: sk 1.4s infinite; border-radius: 6px; }
+  @keyframes sk { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
 }
