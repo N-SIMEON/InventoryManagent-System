@@ -197,6 +197,14 @@ exports.receivePurchaseOrder = async (req, res) => {
     if (po.status !== "SUBMITTED" && po.status !== "PARTIALLY_RECEIVED") {
       return res.status(400).json({ error: `Cannot receive items on a ${po.status} purchase order` });
     }
+    if (!po.isDropship) {
+      await prisma.product.update({
+        where: { id: line.productId },
+          data: { quantity: { increment: receivedQty } },
+      });
+    } else {
+     console.log(`[Dropship] Bypassed warehouse stock increment for ${receivedQty} units of ${line.productId}`);
+    }
 
     let newPoStatus = po.status;
     let allLinesFullyReceived = true;
@@ -383,6 +391,99 @@ exports.failQualityCheck = async (req, res) => {
     res.json({ message: "Quality check failed. Stock quarantined/scrapped." });
   } catch (err) {
     console.error("Fail QC error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+exports.addLandedCost = async (req, res) => {
+  try {
+    const { description, amount } = req.body;
+    if (!description || !amount || amount <= 0) {
+      return res.status(400).json({ error: "description and positive amount are required" });
+    }
+
+    // Verify PO ownership and ensure it's received (costs are usually applied after/during receipt)
+    const po = await prisma.purchaseOrder.findFirst({
+      where: { id: req.params.id, tenantId: req.user.tenantId },
+    });
+
+    if (!po) return res.status(404).json({ error: "Purchase Order not found" });
+    if (po.status !== "RECEIVED" && po.status !== "PARTIALLY_RECEIVED") {
+      return res.status(400).json({ error: "Landed costs can only be added to received purchase orders" });
+    }
+
+    const landedCost = await prisma.landedCost.create({
+      data: {
+        tenantId: req.user.tenantId,
+        purchaseOrderId: po.id,
+        description,
+        amount,
+      },
+    });
+
+    res.status(201).json(landedCost);
+  } catch (err) {
+    console.error("Add landed cost error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+exports.allocateLandedCosts = async (req, res) => {
+  try {
+    // 1. Fetch PO with lines and landed costs
+    const po = await prisma.purchaseOrder.findFirst({
+      where: { id: req.params.id, tenantId: req.user.tenantId },
+      include: { 
+        lines: { include: { product: true } }, 
+        landedCosts: true 
+      },
+    });
+
+    if (!po) return res.status(404).json({ error: "Purchase Order not found" });
+    if (po.status !== "RECEIVED") {
+      return res.status(400).json({ error: "Can only allocate costs on fully RECEIVED purchase orders" });
+    }
+    if (po.landedCosts.length === 0) {
+      return res.status(400).json({ error: "No landed costs to allocate" });
+    }
+
+    // 2. Calculate totals
+    const totalLandedCost = po.landedCosts.reduce((sum, lc) => sum + lc.amount, 0);
+    const totalPOValue = po.lines.reduce((sum, line) => sum + (line.quantity * line.unitPrice), 0);
+
+    if (totalPOValue === 0) {
+      return res.status(400).json({ error: "Cannot allocate: PO total value is 0" });
+    }
+
+    // 3. Allocate costs and update Product Weighted Average Cost (WAC)
+    for (const line of po.lines) {
+      const lineValue = line.quantity * line.unitPrice;
+      
+      // Pro-rata share of landed cost based on value
+      const allocatedCost = (lineValue / totalPOValue) * totalLandedCost;
+      
+      // True cost for this specific receiving batch
+      const batchUnitCost = (lineValue + allocatedCost) / line.quantity;
+
+      // Calculate new Weighted Average Cost (WAC)
+      const currentQty = line.product.quantity;
+      const currentCost = line.product.costPrice;
+      
+      // WAC Formula: ((Old Qty * Old Cost) + (New Qty * New Cost)) / (Old Qty + New Qty)
+      const newWAC = ((currentQty * currentCost) + (line.quantity * batchUnitCost)) / (currentQty + line.quantity);
+
+      // Update the product's cost price
+      await prisma.product.update({
+        where: { id: line.productId },
+        data: { costPrice: newWAC },
+      });
+    }
+
+    res.json({ 
+      message: "Landed costs allocated successfully. Product cost prices updated.",
+      totalAllocated: totalLandedCost 
+    });
+  } catch (err) {
+    console.error("Allocate landed cost error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 };

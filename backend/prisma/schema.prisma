@@ -65,6 +65,7 @@ model Product {
   trackingType TrackingType @default(NONE)
   createdAt    DateTime     @default(now())
   qcStatus     QCStatus     @default(PENDING)
+  costPrice        Float             @default(0)
 
   // Relations
   purchaseOrderLines PurchaseOrderLine[]
@@ -104,6 +105,7 @@ model PurchaseOrder {
   tenant     Tenant   @relation(fields: [tenantId], references: [id])
   supplierId String   @db.Uuid
   supplier   Supplier @relation(fields: [supplierId], references: [id])
+  isDropship     Boolean          @default(false)
 
   orderNumber String // e.g., "PO-2024-001"
   status      POStatus @default(DRAFT)
@@ -115,6 +117,7 @@ model PurchaseOrder {
 
   // Relations
   lines PurchaseOrderLine[]
+  landedCosts      LandedCost[] 
 
   @@unique([tenantId, orderNumber])
   @@index([tenantId])
@@ -213,4 +216,18 @@ model QualityCheck {
 
   @@index([tenantId])
   @@index([lineId])
+}
+model LandedCost {
+  id              String        @id @default(uuid()) @db.Uuid
+  tenantId        String        @db.Uuid
+  purchaseOrderId String        @db.Uuid
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  
+  description     String        // e.g., "Freight Shipping", "Customs Duty"
+  amount          Float         // The cost amount
+  
+  createdAt       DateTime      @default(now())
+
+  @@index([tenantId])
+  @@index([purchaseOrderId])
 }
