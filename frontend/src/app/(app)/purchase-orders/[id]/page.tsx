@@ -84,8 +84,8 @@ export default function PODetailPage() {
         )}
         {(po.status === "RECEIVED" || po.status === "PARTIALLY_RECEIVED") && (
           <div className="grid grid-cols-[1fr_120px_auto_auto] gap-2 items-end">
-            <Field label="Description"><Input placeholder="e.g. Freight" value={cost.description} onChange={(e) => setCost({ ...cost, description: e.target.value })} /></Field>
-            <Field label="Amount"><Input type="number" step="0.01" placeholder="0.00" value={cost.amount} onChange={(e) => setCost({ ...cost, amount: e.target.value })} /></Field>
+            <Field label="Description"><Input placeholder="e.g. Freight" value={cost.description} onChange={(e: any) => setCost({ ...cost, description: e.target.value })} /></Field>
+            <Field label="Amount"><Input type="number" step="0.01" placeholder="0.00" value={cost.amount} onChange={(e: any) => setCost({ ...cost, amount: e.target.value })} /></Field>
             <Button variant="outline" disabled={!cost.description || !Number(cost.amount)}
               onClick={() => act(() => purchaseOrders.addLandedCost(po.id, { description: cost.description, amount: Number(cost.amount) }), "Cost added.")}>Add cost</Button>
             <Button disabled={!canAllocate}

@@ -108,7 +108,7 @@ export default function ReceivePage() {
                 <Button onClick={() => receiveLine(l)} disabled={busy === l.id}>{busy === l.id ? "Receiving…" : "Receive"}</Button>
               </div>
             ) : (
-              <p className="text-sm flex items-center gap-1.5" style={{ color: "var(--green)" }}><Icon.check ?? null /> Fully received</p>
+<p className="text-sm" style={{ color: "var(--green)" }}>✓ Fully received</p>
             )}
           </Card>
         );
