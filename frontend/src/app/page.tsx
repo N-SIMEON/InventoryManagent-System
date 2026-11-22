@@ -1,9 +1,9 @@
 "use client";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { getToken } from "@/lib/api";
+import { getToken, isTokenExpired } from "@/lib/session";
 export default function Home() {
   const router = useRouter();
-  useEffect(() => { router.replace(getToken() ? "/suppliers" : "/login"); }, [router]);
+  useEffect(() => { router.replace(getToken() && !isTokenExpired() ? "/dashboard" : "/login"); }, [router]);
   return null;
 }

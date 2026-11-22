@@ -2,10 +2,12 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import AppShell from "@/components/AppShell";
-import { getToken } from "@/lib/procurement";
+import { getToken, isTokenExpired } from "@/lib/session";
 
 export default function AppGroupLayout({ children }: any) {
   const router = useRouter();
-  useEffect(() => { if (!getToken()) router.replace("/login"); }, [router]);
+  useEffect(() => {
+    if (!getToken() || isTokenExpired()) router.replace("/login");
+  }, [router]);
   return <AppShell>{children}</AppShell>;
 }

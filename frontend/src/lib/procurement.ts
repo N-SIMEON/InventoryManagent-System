@@ -27,7 +27,20 @@ function authHeaders(extra?: HeadersInit): Record<string, string> {
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const res = await fetch(`${BASE_URL}${path}`, { ...options, headers: authHeaders(options.headers) });
+  const token = typeof window !== "undefined" ? localStorage.getItem(TOKEN_KEY) : null;
+  const res = await fetch(`${BASE_URL}${path}`, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(options.headers as Record<string, string>),
+    },
+  });
+  if (res.status === 401 && typeof window !== "undefined") {
+    localStorage.removeItem(TOKEN_KEY);
+    window.location.href = "/login"; // expired session → clean re-login, no red banner
+    throw new Error("Session expired — redirecting to sign in…");
+  }
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(body?.error ?? body?.message ?? `Request failed (${res.status})`);
   return body as T;
@@ -59,10 +72,15 @@ export type PurchaseOrder = {
 
 /* ---------- Suppliers (Task 2.1) ---------- */
 export const suppliers = {
-  list: () => request<Supplier[]>("/suppliers"),
+  list: (status?: "active" | "inactive") =>
+    request<Supplier[]>(status ? `/suppliers?status=${status}` : "/suppliers"),
   create: (d: Omit<Supplier, "id" | "isActive">) =>
     request<Supplier>("/suppliers", { method: "POST", body: JSON.stringify(d) }),
+  update: (id: string, d: Partial<Supplier>) =>
+    request<Supplier>(`/suppliers/${id}`, { method: "PUT", body: JSON.stringify(d) }),
   deactivate: (id: string) => request(`/suppliers/${id}`, { method: "DELETE" }),
+  reactivate: (id: string) =>
+    request<Supplier>(`/suppliers/${id}`, { method: "PUT", body: JSON.stringify({ isActive: true }) }),
 };
 
 /* ---------- Products (read-only stub until Elissa's Task 1.2) ---------- */

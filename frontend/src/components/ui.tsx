@@ -15,6 +15,10 @@ export const Icon = {
   logout: (p: any) => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...p}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>,
   close: (p: any) => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...p}><path d="M18 6 6 18M6 6l12 12"/></svg>,
   inbox: (p: any) => <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" {...p}><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5.5 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.5A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.5Z"/></svg>,
+  chevron: (p: any) => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...p}><path d="m6 9 6 6 6-6"/></svg>,
+  sun:     (p: any) => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...p}><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>,
+  moon:    (p: any) => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...p}><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>,
+  check:   (p: any) => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...p}><path d="M20 6 9 17l-5-5"/></svg>,
 };
 
 /* ---------- Form ---------- */
@@ -96,12 +100,22 @@ export function SlideOver({ open, onClose, title, children, footer }: any) {
 }
 
 /* ---------- Banner (errors) ---------- */
+/* ---------- Banner (errors) ---------- */
 export function Banner({ tone = "red", children }: any) {
-  const map: any = { red: ["var(--red-bg)", "var(--red)"], green: ["var(--green-bg)", "var(--green)"] };
-  const [bg, fg] = map[tone];
-  return <div className="text-sm px-3 py-2 rounded-lg mb-3" style={{ background: bg, color: fg }}>{children}</div>;
+  const map: Record<string, [string, string]> = {
+    red:   ["var(--red-bg)",    "var(--red)"],
+    green: ["var(--green-bg)",  "var(--green)"],
+    amber: ["var(--amber-bg)",  "var(--amber)"],
+    blue:  ["var(--surface-2)", "var(--primary)"],
+    slate: ["var(--slate-bg)",  "var(--slate)"],
+  };
+  const [bg, fg] = map[tone] ?? map.red;   // ← fallback: unknown tone can never crash the app
+  return (
+    <div className="text-sm px-3 py-2 rounded-lg mb-3" style={{ background: bg, color: fg }}>
+      {children}
+    </div>
+  );
 }
-
 /* ---------- useAsync helper ---------- */
 export function useAsync<T>(fn: () => Promise<T>, deps: any[] = []) {
   const [data, setData] = useState<T | null>(null);
