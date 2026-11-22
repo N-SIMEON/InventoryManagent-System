@@ -62,12 +62,10 @@ model Product {
   name         String
   sku          String
   quantity     Int          @default(0)
-  trackingType TrackingType @default(NONE)
+  trackingType TrackingType @default(NONE) // Task 2.4
+  costPrice    Float        @default(0)    // Task 2.6
   createdAt    DateTime     @default(now())
-  qcStatus     QCStatus     @default(PENDING)
-  costPrice        Float             @default(0)
 
-  // Relations
   purchaseOrderLines PurchaseOrderLine[]
   lots               Lot[]
   serials            SerialNumber[]
@@ -137,10 +135,12 @@ model PurchaseOrderLine {
   unitPrice Float
   lineTotal Float // Computed: quantity * unitPrice
 
-  receivedQty   Int            @default(0) // Used in Task 2.3 (Receiving)
+  receivedQty   Int      @default(0) // Task 2.3
+  qcStatus      QCStatus @default(PENDING) // Task 2.5 — ADD THIS
   qualityChecks QualityCheck[]
 
   @@index([purchaseOrderId])
+  @@index([qcStatus]) // speeds the "show me pending QC" queue
 }
 
 // ==========================================
