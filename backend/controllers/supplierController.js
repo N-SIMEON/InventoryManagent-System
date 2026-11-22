@@ -23,9 +23,14 @@ exports.createSupplier = async (req, res) => {
 
 exports.getSuppliers = async (req, res) => {
   try {
+    const { status } = req.query; // active | inactive | all (default)
+    const where = { tenantId: req.user.tenantId };
+    if (status === "active") where.isActive = true;
+    if (status === "inactive") where.isActive = false;
+
     const suppliers = await prisma.supplier.findMany({
-      where: { tenantId: req.user.tenantId, isActive: true },
-      orderBy: { createdAt: "desc" },
+      where,
+      orderBy: [{ isActive: "desc" }, { createdAt: "desc" }],
     });
     res.json(suppliers);
   } catch (err) {
